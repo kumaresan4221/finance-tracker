@@ -69,7 +69,124 @@
   </style>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <script type="module">
-    // JavaScript remains unchanged (already complete)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAy8oWoafy7D4dmRteUTbSiwi2cgvv2R0o",
+      authDomain: "finance-c2952.firebaseapp.com",
+      databaseURL: "https://finance-c2952-default-rtdb.firebaseio.com",
+      projectId: "finance-c2952",
+      storageBucket: "finance-c2952.appspot.com",
+      messagingSenderId: "930628148516",
+      appId: "1:930628148516:web:ba21b485b0fc40831c67b1"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    let currentUID = null;
+
+    const authSection = document.getElementById("auth-section");
+    const mainSection = document.getElementById("main-section");
+    const authMessage = document.getElementById("auth-message");
+
+    window.register = () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(() => authMessage.innerText = "✅ Registered successfully!")
+        .catch(error => authMessage.innerText = "❌ " + error.message);
+    };
+
+    window.login = () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => authMessage.innerText = "✅ Login successful!")
+        .catch(error => authMessage.innerText = "❌ " + error.message);
+    };
+
+    window.logout = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUID = user.uid;
+        authSection.classList.add("hidden");
+        mainSection.classList.remove("hidden");
+        loadCustomersByDate();
+      } else {
+        authSection.classList.remove("hidden");
+        mainSection.classList.add("hidden");
+        currentUID = null;
+      }
+    });
+
+    window.addCustomer = () => {
+      const regNo = document.getElementById("regNo").value.trim();
+      const name = document.getElementById("name").value.trim();
+      const due = parseFloat(document.getElementById("dueAmount").value);
+      const recordDate = document.getElementById("recordDate").value;
+
+      set(ref(db, `users/${currentUID}/dailyData/${recordDate}/${regNo}`), {
+        name, totalDue: due, paid: 0, remaining: due
+      }).then(() => loadCustomersByDate());
+    };
+
+    window.updateDue = () => {
+      const regNo = document.getElementById("updateRegNo").value.trim();
+      const paid = parseFloat(document.getElementById("dailyPaid").value);
+      const viewDate = document.getElementById("viewDate").value;
+      const custRef = ref(db, `users/${currentUID}/dailyData/${viewDate}/${regNo}`);
+
+      get(custRef).then(snapshot => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const newPaid = (data.paid || 0) + paid;
+          const remaining = (data.totalDue || 0) - newPaid;
+          update(custRef, { paid: newPaid, remaining: remaining >= 0 ? remaining : 0 })
+            .then(() => loadCustomersByDate());
+        }
+      });
+    };
+
+    window.loadCustomersByDate = () => {
+      const viewDate = document.getElementById("viewDate").value;
+      if (!viewDate) return;
+
+      const tbody = document.getElementById("customerTableBody");
+      tbody.innerHTML = "";
+
+      get(ref(db, `users/${currentUID}/dailyData/${viewDate}`)).then(snapshot => {
+        if (snapshot.exists()) {
+          Object.entries(snapshot.val()).forEach(([regNo, info]) => {
+            tbody.innerHTML += `<tr><td>${regNo}</td><td>${info.name}</td><td>${info.totalDue}</td><td>${info.paid}</td><td>${info.remaining}</td></tr>`;
+          });
+        }
+      });
+    };
+
+    window.exportToExcel = async () => {
+      const date = document.getElementById("viewDate").value;
+      if (!date) return alert("Select a date");
+
+      const snapshot = await get(ref(db, `users/${currentUID}/dailyData/${date}`));
+      if (!snapshot.exists()) return alert("No data for that date");
+
+      const rows = Object.entries(snapshot.val()).map(([regNo, info]) => ({
+        "Reg No": regNo,
+        "Name": info.name,
+        "Total Due": info.totalDue,
+        "Paid": info.paid,
+        "Remaining": info.remaining
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, date);
+      XLSX.writeFile(wb, `Due_${date}.xlsx`);
+    };
   </script>
 </head>
 <body>
