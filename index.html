@@ -30,7 +30,7 @@
       box-shadow: 0 0 10px #00f7ff33;
     }
 
-    input, select {
+    input {
       width: calc(100% - 22px);
       padding: 10px;
       margin: 8px 0;
@@ -140,7 +140,7 @@
     </div>
 
     <div class="center">
-      <button class="glow-btn" onclick="exportToExcel()">⬇️ Download as Excel</button>
+      <button class="glow-btn" onclick="exportToExcel()">⬇️ Download Monthly Excel</button>
       <button class="glow-btn" onclick="logout()">Logout</button>
     </div>
   </div>
@@ -281,7 +281,7 @@
     });
   }
 
-  // ✅ Export to Excel
+  // ✅ Export to Excel with Month-Year in filename
   window.exportToExcel = async () => {
     if (!currentUID) return alert("User not logged in");
 
@@ -301,7 +301,13 @@
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
-    XLSX.writeFile(workbook, "customer_due_data.xlsx");
+
+    const now = new Date();
+    const month = now.toLocaleString('default', { month: 'long' });
+    const year = now.getFullYear();
+    const fileName = `customer_due_${month}_${year}.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
   };
 </script>
 
