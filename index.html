@@ -12,7 +12,7 @@
       margin: 0;
       padding: 20px;
     }
-    h2, h3 {
+    h1, h2, h3 {
       text-align: center;
     }
     .container {
@@ -48,9 +48,6 @@
     .glow-btn:hover {
       background: #1e40af;
     }
-    .hidden {
-      display: none;
-    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -73,233 +70,89 @@
       }
     }
   </style>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import {
-      getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-      onAuthStateChanged, signOut
-    } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
-    import {
-      getDatabase, ref, set, get, update
-    } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAy8oWoafy7D4dmRteUTbSiwi2cgvv2R0o",
-      authDomain: "finance-c2952.firebaseapp.com",
-      databaseURL: "https://finance-c2952-default-rtdb.firebaseio.com",
-      projectId: "finance-c2952",
-      storageBucket: "finance-c2952.appspot.com",
-      messagingSenderId: "930628148516",
-      appId: "1:930628148516:web:ba21b485b0fc40831c67b1"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
-
-    let currentUID = null;
-
-    const authSection = document.getElementById("auth-section");
-    const mainSection = document.getElementById("main-section");
-    const authMessage = document.getElementById("auth-message");
-
-    // Auth handlers
-    window.register = () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      createUserWithEmailAndPassword(auth, email, password)
-        .then(() => authMessage.innerText = "✅ Registered successfully!")
-        .catch(error => authMessage.innerText = "❌ " + error.message);
-    };
-
-    window.login = () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      signInWithEmailAndPassword(auth, email, password)
-        .then(() => authMessage.innerText = "✅ Login successful!")
-        .catch(error => authMessage.innerText = "❌ " + error.message);
-    };
-
-    window.logout = () => signOut(auth);
-
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        currentUID = user.uid;
-        authSection.classList.add("hidden");
-        mainSection.classList.remove("hidden");
-      } else {
-        authSection.classList.remove("hidden");
-        mainSection.classList.add("hidden");
-        currentUID = null;
-      }
-    });
-
-    // Add new customer
-    window.addCustomer = () => {
-      const regNo = document.getElementById("regNo").value.trim();
-      const name = document.getElementById("name").value.trim();
-      const due = parseFloat(document.getElementById("dueAmount").value);
-      const recordDate = document.getElementById("recordDate").value;
-
-      if (!regNo || !name || isNaN(due) || due <= 0 || !recordDate) {
-        alert("⚠️ Please enter valid customer details.");
-        return;
-      }
-
-      const refPath = `users/${currentUID}/dailyData/${recordDate}/${regNo}`;
-      set(ref(db, refPath), {
-        name,
-        totalDue: due,
-        paid: 0,
-        remaining: due
-      }).then(() => {
-        document.getElementById("regNo").value = "";
-        document.getElementById("name").value = "";
-        document.getElementById("dueAmount").value = "";
-        loadCustomersByDate();
-        alert("✅ Customer added successfully!");
-      });
-    };
-
-    // Update payment
-    window.updateDue = () => {
-      const regNo = document.getElementById("updateRegNo").value.trim();
-      const paid = parseFloat(document.getElementById("dailyPaid").value);
-      const date = document.getElementById("viewDate").value;
-
-      if (!regNo || isNaN(paid) || paid <= 0 || !date) {
-        alert("⚠️ Please enter valid update details.");
-        return;
-      }
-
-      const custRef = ref(db, `users/${currentUID}/dailyData/${date}/${regNo}`);
-      get(custRef).then(snapshot => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const newPaid = (data.paid || 0) + paid;
-          const remaining = (data.totalDue || 0) - newPaid;
-          update(custRef, {
-            paid: newPaid,
-            remaining: remaining >= 0 ? remaining : 0
-          }).then(() => {
-            document.getElementById("updateRegNo").value = "";
-            document.getElementById("dailyPaid").value = "";
-            loadCustomersByDate();
-            alert("✅ Payment updated.");
-          });
-        } else {
-          alert("❌ Customer not found for that date.");
-        }
-      });
-    };
-
-    // Load customers by date
-    window.loadCustomersByDate = () => {
-      const viewDate = document.getElementById("viewDate").value;
-      if (!viewDate || !currentUID) return;
-
-      const tbody = document.getElementById("customerTableBody");
-      tbody.innerHTML = "";
-
-      get(ref(db, `users/${currentUID}/dailyData/${viewDate}`)).then(snapshot => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          Object.entries(data).forEach(([regNo, info]) => {
-            const row = tbody.insertRow();
-            row.innerHTML = `
-              <td>${regNo}</td>
-              <td>${info.name}</td>
-              <td>${info.totalDue}</td>
-              <td>${info.paid}</td>
-              <td>${info.remaining}</td>
-            `;
-          });
-        } else {
-          const row = tbody.insertRow();
-          row.innerHTML = `<td colspan="5">No data found for selected date.</td>`;
-        }
-      });
-    };
-
-    // Export to Excel
-    window.exportToExcel = async () => {
-      const date = document.getElementById("viewDate").value;
-      if (!date || !currentUID) return alert("Select a valid date");
-
-      const snapshot = await get(ref(db, `users/${currentUID}/dailyData/${date}`));
-      if (!snapshot.exists()) return alert("No data to export");
-
-      const rows = Object.entries(snapshot.val()).map(([regNo, info]) => ({
-        "Reg No": regNo,
-        "Name": info.name,
-        "Total Due": info.totalDue,
-        "Paid": info.paid,
-        "Remaining": info.remaining
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, date);
-      XLSX.writeFile(wb, `Due_${date}.xlsx`);
-    };
-  </script>
 </head>
 <body>
   <div class="container">
-    <div id="auth-section">
-      <h2>Login / Register</h2>
-      <div class="form-container center">
-        <input type="email" id="email" placeholder="Email" />
-        <input type="password" id="password" placeholder="Password" />
-        <button class="glow-btn" onclick="register()">Register</button>
-        <button class="glow-btn" onclick="login()">Login</button>
-        <div id="auth-message"></div>
-      </div>
-    </div>
+    <header>
+      <h1>💰 Finance Tracker</h1>
+    </header>
 
-    <div id="main-section" class="hidden">
-      <h2>📅 Daily Customer Due Tracker</h2>
+    <main>
+      <section class="form-container">
+        <h2>Add Due Amount</h2>
+        <form id="dueForm">
+          <label for="regNo">Register Number:</label>
+          <input type="text" id="regNo" name="regNo" required>
 
-      <div class="form-container">
-        <h3>Add Customer Entry</h3>
-        <input type="date" id="recordDate" />
-        <input type="text" id="regNo" placeholder="Reg No" />
-        <input type="text" id="name" placeholder="Customer Name" />
-        <input type="number" id="dueAmount" placeholder="Total Due Amount" />
-        <button class="glow-btn" onclick="addCustomer()">Add Customer</button>
-      </div>
+          <label for="name">Customer Name:</label>
+          <input type="text" id="name" name="name" required>
 
-      <div class="form-container">
-        <h3>Update Daily Paid</h3>
-        <input type="date" id="viewDate" />
-        <input type="text" id="updateRegNo" placeholder="Reg No" />
-        <input type="number" id="dailyPaid" placeholder="Daily Paid Amount" />
-        <button class="glow-btn" onclick="updateDue()">Update Due</button>
-      </div>
+          <label for="dueAmount">Due Amount (₹):</label>
+          <input type="number" id="dueAmount" name="dueAmount" required>
 
-      <div class="form-container">
-        <h3>Customer List for Selected Date</h3>
-        <input type="date" id="viewDate" onchange="loadCustomersByDate()" />
-        <table>
+          <button type="submit" class="glow-btn">Add Entry</button>
+        </form>
+      </section>
+
+      <section class="form-container">
+        <h2>Customer Due Details</h2>
+        <input type="date" id="filterDate" />
+        <table id="dueTable">
           <thead>
             <tr>
-              <th>Reg No</th>
-              <th>Name</th>
-              <th>Total Due</th>
-              <th>Paid</th>
-              <th>Remaining</th>
+              <th>Register No</th>
+              <th>Customer Name</th>
+              <th>Due Amount (₹)</th>
+              <th>Date</th>
             </tr>
           </thead>
-          <tbody id="customerTableBody"></tbody>
+          <tbody>
+            <!-- Entries will appear here -->
+          </tbody>
         </table>
-      </div>
-
-      <div class="center">
-        <button class="glow-btn" onclick="exportToExcel()">⬇️ Export Excel</button>
-        <button class="glow-btn" onclick="logout()">Logout</button>
-      </div>
-    </div>
+      </section>
+    </main>
   </div>
+
+  <script>
+    const form = document.getElementById('dueForm');
+    const tableBody = document.querySelector('#dueTable tbody');
+    const filterDate = document.getElementById('filterDate');
+
+    const entries = [];
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const regNo = document.getElementById('regNo').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const dueAmount = parseFloat(document.getElementById('dueAmount').value).toFixed(2);
+      const date = new Date().toISOString().split('T')[0];
+
+      const entry = { regNo, name, dueAmount, date };
+      entries.push(entry);
+
+      appendRow(entry);
+      form.reset();
+    });
+
+    filterDate.addEventListener('change', () => {
+      const selectedDate = filterDate.value;
+      tableBody.innerHTML = '';
+      const filtered = selectedDate ? entries.filter(e => e.date === selectedDate) : entries;
+      filtered.forEach(appendRow);
+    });
+
+    function appendRow(entry) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${entry.regNo}</td>
+        <td>${entry.name}</td>
+        <td>₹${entry.dueAmount}</td>
+        <td>${entry.date}</td>
+      `;
+      tableBody.appendChild(row);
+    }
+  </script>
 </body>
 </html>
