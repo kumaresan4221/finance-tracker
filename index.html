@@ -80,203 +80,230 @@
       text-align: center;
     }
   </style>
+
+  <!-- ✅ SheetJS for Excel Export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-  <div class="container">
-    <!-- 🔐 Login/Register Section -->
-    <div id="auth-section">
-      <h2>Login / Register</h2>
-      <div class="form-container center">
-        <input type="email" id="email" placeholder="Email" />
-        <input type="password" id="password" placeholder="Password" />
-        <button class="glow-btn" onclick="register()">Register</button>
-        <button class="glow-btn" onclick="login()">Login</button>
-        <div id="auth-message"></div>
-      </div>
-    </div>
-
-    <!-- 📊 Main App -->
-    <div id="main-section" class="hidden">
-      <h2>💰 Customer Due Tracker</h2>
-
-      <!-- Add Customer -->
-      <div class="form-container">
-        <h3>Add Customer</h3>
-        <input type="text" id="regNo" placeholder="Reg No" />
-        <input type="text" id="name" placeholder="Customer Name" />
-        <input type="number" id="dueAmount" placeholder="Total Due Amount" />
-        <button class="glow-btn" onclick="addCustomer()">Add Customer</button>
-      </div>
-
-      <!-- Update Due -->
-      <div class="form-container">
-        <h3>Update Daily Paid</h3>
-        <input type="text" id="updateRegNo" placeholder="Reg No" />
-        <input type="number" id="dailyPaid" placeholder="Daily Paid Amount" />
-        <input type="date" id="paymentDate" />
-        <button class="glow-btn" onclick="updateDue()">Update Due</button>
-      </div>
-
-      <!-- Table -->
-      <div class="form-container">
-        <h3>Customer List</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Reg No</th>
-              <th>Name</th>
-              <th>Total Due</th>
-              <th>Paid</th>
-              <th>Remaining</th>
-              <th>Last Payment</th>
-            </tr>
-          </thead>
-          <tbody id="customerTableBody"></tbody>
-        </table>
-      </div>
-
-      <div class="center">
-        <button class="glow-btn" onclick="logout()">Logout</button>
-      </div>
+<div class="container">
+  <!-- 🔐 Login/Register Section -->
+  <div id="auth-section">
+    <h2>Login / Register</h2>
+    <div class="form-container center">
+      <input type="email" id="email" placeholder="Email" />
+      <input type="password" id="password" placeholder="Password" />
+      <button class="glow-btn" onclick="register()">Register</button>
+      <button class="glow-btn" onclick="login()">Login</button>
+      <div id="auth-message"></div>
     </div>
   </div>
 
-  <!-- Firebase SDKs -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import { getDatabase, ref, set, update, get } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+  <!-- 📊 Main App -->
+  <div id="main-section" class="hidden">
+    <h2>💰 Customer Due Tracker</h2>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAy8oWoafy7D4dmRteUTbSiwi2cgvv2R0o",
-      authDomain: "finance-c2952.firebaseapp.com",
-      databaseURL: "https://finance-c2952-default-rtdb.firebaseio.com",
-      projectId: "finance-c2952",
-      storageBucket: "finance-c2952.appspot.com",
-      messagingSenderId: "930628148516",
-      appId: "1:930628148516:web:ba21b485b0fc40831c67b1"
-    };
+    <!-- Add Customer -->
+    <div class="form-container">
+      <h3>Add Customer</h3>
+      <input type="text" id="regNo" placeholder="Reg No" />
+      <input type="text" id="name" placeholder="Customer Name" />
+      <input type="number" id="dueAmount" placeholder="Total Due Amount" />
+      <button class="glow-btn" onclick="addCustomer()">Add Customer</button>
+    </div>
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const auth = getAuth(app);
-    let currentUID = null;
+    <!-- Update Due -->
+    <div class="form-container">
+      <h3>Update Daily Paid</h3>
+      <input type="text" id="updateRegNo" placeholder="Reg No" />
+      <input type="number" id="dailyPaid" placeholder="Daily Paid Amount" />
+      <input type="date" id="paymentDate" />
+      <button class="glow-btn" onclick="updateDue()">Update Due</button>
+    </div>
 
-    const authSection = document.getElementById("auth-section");
-    const mainSection = document.getElementById("main-section");
-    const authMessage = document.getElementById("auth-message");
+    <!-- Table -->
+    <div class="form-container">
+      <h3>Customer List</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Reg No</th>
+            <th>Name</th>
+            <th>Total Due</th>
+            <th>Paid</th>
+            <th>Remaining</th>
+            <th>Last Payment</th>
+          </tr>
+        </thead>
+        <tbody id="customerTableBody"></tbody>
+      </table>
+    </div>
 
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        currentUID = user.uid;
-        authSection.classList.add("hidden");
-        mainSection.classList.remove("hidden");
-        loadCustomers();
+    <div class="center">
+      <button class="glow-btn" onclick="exportToExcel()">⬇️ Download as Excel</button>
+      <button class="glow-btn" onclick="logout()">Logout</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+  import { getDatabase, ref, set, update, get } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAy8oWoafy7D4dmRteUTbSiwi2cgvv2R0o",
+    authDomain: "finance-c2952.firebaseapp.com",
+    databaseURL: "https://finance-c2952-default-rtdb.firebaseio.com",
+    projectId: "finance-c2952",
+    storageBucket: "finance-c2952.appspot.com",
+    messagingSenderId: "930628148516",
+    appId: "1:930628148516:web:ba21b485b0fc40831c67b1"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const auth = getAuth(app);
+  let currentUID = null;
+
+  const authSection = document.getElementById("auth-section");
+  const mainSection = document.getElementById("main-section");
+  const authMessage = document.getElementById("auth-message");
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUID = user.uid;
+      authSection.classList.add("hidden");
+      mainSection.classList.remove("hidden");
+      loadCustomers();
+    } else {
+      authSection.classList.remove("hidden");
+      mainSection.classList.add("hidden");
+      currentUID = null;
+    }
+  });
+
+  window.register = () => {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("password").value;
+    if (!email || !pass) return alert("Please enter email and password");
+
+    createUserWithEmailAndPassword(auth, email, pass)
+      .then(() => authMessage.innerText = "✅ Registered successfully!")
+      .catch(e => authMessage.innerText = "❌ " + e.message);
+  };
+
+  window.login = () => {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("password").value;
+    if (!email || !pass) return alert("Please enter email and password");
+
+    signInWithEmailAndPassword(auth, email, pass)
+      .then(() => authMessage.innerText = "✅ Login successful!")
+      .catch(e => authMessage.innerText = "❌ " + e.message);
+  };
+
+  window.logout = () => signOut(auth);
+
+  window.addCustomer = () => {
+    const regNo = document.getElementById("regNo").value.trim();
+    const name = document.getElementById("name").value.trim();
+    const due = parseFloat(document.getElementById("dueAmount").value);
+
+    if (!regNo || !name || isNaN(due)) return alert("Please fill all fields correctly");
+    if (!currentUID) return alert("User not logged in");
+
+    set(ref(db, `users/${currentUID}/customers/${regNo}`), {
+      name: name,
+      totalDue: due,
+      paid: 0,
+      remaining: due,
+      lastPaid: "N/A"
+    }).then(() => {
+      loadCustomers();
+      document.getElementById("regNo").value = "";
+      document.getElementById("name").value = "";
+      document.getElementById("dueAmount").value = "";
+    });
+  };
+
+  window.updateDue = () => {
+    const regNo = document.getElementById("updateRegNo").value.trim();
+    const dailyPaid = parseFloat(document.getElementById("dailyPaid").value);
+    const payDate = document.getElementById("paymentDate").value;
+
+    if (!regNo || isNaN(dailyPaid) || !payDate) return alert("Please fill all fields");
+    if (!currentUID) return alert("User not logged in");
+
+    const custRef = ref(db, `users/${currentUID}/customers/${regNo}`);
+    get(custRef).then(snapshot => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const newPaid = (data.paid || 0) + dailyPaid;
+        const remaining = (data.totalDue || 0) - newPaid;
+
+        update(custRef, {
+          paid: newPaid,
+          remaining: remaining >= 0 ? remaining : 0,
+          lastPaid: payDate
+        }).then(() => {
+          loadCustomers();
+          document.getElementById("updateRegNo").value = "";
+          document.getElementById("dailyPaid").value = "";
+          document.getElementById("paymentDate").value = "";
+        });
       } else {
-        authSection.classList.remove("hidden");
-        mainSection.classList.add("hidden");
-        currentUID = null;
+        alert("Customer not found!");
       }
     });
+  };
 
-    window.register = () => {
-      const email = document.getElementById("email").value;
-      const pass = document.getElementById("password").value;
-      if (!email || !pass) return alert("Please enter email and password");
+  function loadCustomers() {
+    if (!currentUID) return;
+    get(ref(db, `users/${currentUID}/customers`)).then(snapshot => {
+      const tbody = document.getElementById("customerTableBody");
+      tbody.innerHTML = "";
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        Object.entries(data).forEach(([regNo, info]) => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${regNo}</td>
+              <td>${info.name}</td>
+              <td>${info.totalDue}</td>
+              <td>${info.paid}</td>
+              <td>${info.remaining}</td>
+              <td>${info.lastPaid}</td>
+            </tr>`;
+        });
+      }
+    });
+  }
 
-      createUserWithEmailAndPassword(auth, email, pass)
-        .then(() => authMessage.innerText = "✅ Registered successfully!")
-        .catch(e => authMessage.innerText = "❌ " + e.message);
-    };
+  // ✅ Export to Excel
+  window.exportToExcel = async () => {
+    if (!currentUID) return alert("User not logged in");
 
-    window.login = () => {
-      const email = document.getElementById("email").value;
-      const pass = document.getElementById("password").value;
-      if (!email || !pass) return alert("Please enter email and password");
+    const snapshot = await get(ref(db, `users/${currentUID}/customers`));
+    if (!snapshot.exists()) return alert("No customer data to export");
 
-      signInWithEmailAndPassword(auth, email, pass)
-        .then(() => authMessage.innerText = "✅ Login successful!")
-        .catch(e => authMessage.innerText = "❌ " + e.message);
-    };
+    const data = snapshot.val();
+    const rows = Object.entries(data).map(([regNo, info]) => ({
+      "Reg No": regNo,
+      "Name": info.name,
+      "Total Due": info.totalDue,
+      "Paid": info.paid,
+      "Remaining": info.remaining,
+      "Last Payment": info.lastPaid
+    }));
 
-    window.logout = () => signOut(auth);
-
-    window.addCustomer = () => {
-      const regNo = document.getElementById("regNo").value.trim();
-      const name = document.getElementById("name").value.trim();
-      const due = parseFloat(document.getElementById("dueAmount").value);
-
-      if (!regNo || !name || isNaN(due)) return alert("Please fill all fields correctly");
-      if (!currentUID) return alert("User not logged in");
-
-      set(ref(db, `users/${currentUID}/customers/${regNo}`), {
-        name: name,
-        totalDue: due,
-        paid: 0,
-        remaining: due,
-        lastPaid: "N/A"
-      }).then(() => {
-        loadCustomers();
-        document.getElementById("regNo").value = "";
-        document.getElementById("name").value = "";
-        document.getElementById("dueAmount").value = "";
-      });
-    };
-
-    window.updateDue = () => {
-      const regNo = document.getElementById("updateRegNo").value.trim();
-      const dailyPaid = parseFloat(document.getElementById("dailyPaid").value);
-      const payDate = document.getElementById("paymentDate").value;
-
-      if (!regNo || isNaN(dailyPaid) || !payDate) return alert("Please fill all fields");
-      if (!currentUID) return alert("User not logged in");
-
-      const custRef = ref(db, `users/${currentUID}/customers/${regNo}`);
-      get(custRef).then(snapshot => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const newPaid = (data.paid || 0) + dailyPaid;
-          const remaining = (data.totalDue || 0) - newPaid;
-
-          update(custRef, {
-            paid: newPaid,
-            remaining: remaining >= 0 ? remaining : 0,
-            lastPaid: payDate
-          }).then(() => {
-            loadCustomers();
-            document.getElementById("updateRegNo").value = "";
-            document.getElementById("dailyPaid").value = "";
-            document.getElementById("paymentDate").value = "";
-          });
-        } else {
-          alert("Customer not found!");
-        }
-      });
-    };
-
-    function loadCustomers() {
-      if (!currentUID) return;
-      get(ref(db, `users/${currentUID}/customers`)).then(snapshot => {
-        const tbody = document.getElementById("customerTableBody");
-        tbody.innerHTML = "";
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          Object.entries(data).forEach(([regNo, info]) => {
-            tbody.innerHTML += `
-              <tr>
-                <td>${regNo}</td>
-                <td>${info.name}</td>
-                <td>${info.totalDue}</td>
-                <td>${info.paid}</td>
-                <td>${info.remaining}</td>
-                <td>${info.lastPaid}</td>
-              </tr>`;
-          });
-        }
-      });
-    }
-  </script>
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+    XLSX.writeFile(workbook, "customer_due_data.xlsx");
+  };
+</script>
 
 </body>
 </html>
