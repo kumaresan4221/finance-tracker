@@ -12,8 +12,7 @@
       margin: 0;
       padding: 20px;
     }
-    h2 {
-      color: #111827;
+    h2, h3 {
       text-align: center;
     }
     .container {
@@ -28,13 +27,12 @@
       box-shadow: 0 0 10px #ccc;
     }
     input, select {
-      width: calc(100% - 22px);
+      width: 100%;
       padding: 10px;
       margin: 8px 0;
       border-radius: 8px;
       border: 1px solid #ccc;
-      background: #fff;
-      color: #111827;
+      box-sizing: border-box;
     }
     .glow-btn {
       background: #2563eb;
@@ -50,7 +48,9 @@
     .glow-btn:hover {
       background: #1e40af;
     }
-    .hidden { display: none; }
+    .hidden {
+      display: none;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -67,12 +67,22 @@
     .center {
       text-align: center;
     }
+    @media screen and (max-width: 600px) {
+      input, button {
+        font-size: 16px;
+      }
+    }
   </style>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
-    import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+    import {
+      getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+      onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+    import {
+      getDatabase, ref, set, get, update
+    } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAy8oWoafy7D4dmRteUTbSiwi2cgvv2R0o",
@@ -87,12 +97,14 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
+
     let currentUID = null;
 
     const authSection = document.getElementById("auth-section");
     const mainSection = document.getElementById("main-section");
     const authMessage = document.getElementById("auth-message");
 
+    // Auth handlers
     window.register = () => {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -116,7 +128,6 @@
         currentUID = user.uid;
         authSection.classList.add("hidden");
         mainSection.classList.remove("hidden");
-        loadCustomersByDate();
       } else {
         authSection.classList.remove("hidden");
         mainSection.classList.add("hidden");
@@ -124,6 +135,7 @@
       }
     });
 
+    // Add new customer
     window.addCustomer = () => {
       const regNo = document.getElementById("regNo").value.trim();
       const name = document.getElementById("name").value.trim();
@@ -135,7 +147,8 @@
         return;
       }
 
-      set(ref(db, `users/${currentUID}/dailyData/${recordDate}/${regNo}`), {
+      const refPath = `users/${currentUID}/dailyData/${recordDate}/${regNo}`;
+      set(ref(db, refPath), {
         name,
         totalDue: due,
         paid: 0,
@@ -149,59 +162,73 @@
       });
     };
 
+    // Update payment
     window.updateDue = () => {
       const regNo = document.getElementById("updateRegNo").value.trim();
       const paid = parseFloat(document.getElementById("dailyPaid").value);
-      const viewDate = document.getElementById("viewDate").value;
-      const custRef = ref(db, `users/${currentUID}/dailyData/${viewDate}/${regNo}`);
+      const date = document.getElementById("viewDate").value;
 
-      if (!regNo || isNaN(paid) || paid <= 0 || !viewDate) {
+      if (!regNo || isNaN(paid) || paid <= 0 || !date) {
         alert("⚠️ Please enter valid update details.");
         return;
       }
 
+      const custRef = ref(db, `users/${currentUID}/dailyData/${date}/${regNo}`);
       get(custRef).then(snapshot => {
         if (snapshot.exists()) {
           const data = snapshot.val();
           const newPaid = (data.paid || 0) + paid;
           const remaining = (data.totalDue || 0) - newPaid;
-          update(custRef, { paid: newPaid, remaining: remaining >= 0 ? remaining : 0 })
-            .then(() => {
-              document.getElementById("updateRegNo").value = "";
-              document.getElementById("dailyPaid").value = "";
-              loadCustomersByDate();
-              alert("✅ Payment updated.");
-            });
+          update(custRef, {
+            paid: newPaid,
+            remaining: remaining >= 0 ? remaining : 0
+          }).then(() => {
+            document.getElementById("updateRegNo").value = "";
+            document.getElementById("dailyPaid").value = "";
+            loadCustomersByDate();
+            alert("✅ Payment updated.");
+          });
         } else {
           alert("❌ Customer not found for that date.");
         }
       });
     };
 
+    // Load customers by date
     window.loadCustomersByDate = () => {
       const viewDate = document.getElementById("viewDate").value;
-      if (!viewDate) return;
+      if (!viewDate || !currentUID) return;
 
       const tbody = document.getElementById("customerTableBody");
       tbody.innerHTML = "";
 
       get(ref(db, `users/${currentUID}/dailyData/${viewDate}`)).then(snapshot => {
         if (snapshot.exists()) {
-          Object.entries(snapshot.val()).forEach(([regNo, info]) => {
-            tbody.innerHTML += `<tr><td>${regNo}</td><td>${info.name}</td><td>${info.totalDue}</td><td>${info.paid}</td><td>${info.remaining}</td></tr>`;
+          const data = snapshot.val();
+          Object.entries(data).forEach(([regNo, info]) => {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+              <td>${regNo}</td>
+              <td>${info.name}</td>
+              <td>${info.totalDue}</td>
+              <td>${info.paid}</td>
+              <td>${info.remaining}</td>
+            `;
           });
         } else {
-          tbody.innerHTML = `<tr><td colspan="5">No data found for selected date.</td></tr>`;
+          const row = tbody.insertRow();
+          row.innerHTML = `<td colspan="5">No data found for selected date.</td>`;
         }
       });
     };
 
+    // Export to Excel
     window.exportToExcel = async () => {
       const date = document.getElementById("viewDate").value;
-      if (!date) return alert("Select a date");
+      if (!date || !currentUID) return alert("Select a valid date");
 
       const snapshot = await get(ref(db, `users/${currentUID}/dailyData/${date}`));
-      if (!snapshot.exists()) return alert("No data for that date");
+      if (!snapshot.exists()) return alert("No data to export");
 
       const rows = Object.entries(snapshot.val()).map(([regNo, info]) => ({
         "Reg No": regNo,
